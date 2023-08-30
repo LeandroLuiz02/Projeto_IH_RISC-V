@@ -1,40 +1,38 @@
 `timescale 1ns / 1ps
 
-module Controller (
-    //Input
-    input logic [6:0] Opcode,
-    //7-bit opcode field from the instruction
+module ALUController (
+    //Inputs
+    input logic [1:0] ALUOp,  // 2-bit opcode field from the Controller--00: LW/SW/AUIPC; 01:Branch; 10: Rtype/Itype; 11:JAL/LUI
+    input logic [6:0] Funct7,  // bits 25 to 31 of the instruction
+    input logic [2:0] Funct3,  // bits 12 to 14 of the instruction
 
-    //Outputs
-    output logic ALUSrc,
-    //0: The second ALU operand comes from the second register file output (Read data 2); 
-    //1: The second ALU operand is the sign-extended, lower 16 bits of the instruction.
-    output logic MemtoReg,
-    //0: The value fed to the register Write data input comes from the ALU.
-    //1: The value fed to the register Write data input comes from the data memory.
-    output logic RegWrite, //The register on the Write register input is written with the value on the Write data input 
-    output logic MemRead,  //Data memory contents designated by the address input are put on the Read data output
-    output logic MemWrite, //Data memory contents designated by the address input are replaced by the value on the Write data input.
-    output logic [1:0] ALUOp,  //00: LW/SW; 01:Branch; 10: Rtype
-    output logic Branch  //0: branch is not taken; 1: branch is taken
+    //Output
+    output logic [3:0] Operation  // operation selection for ALU
 );
 
-  logic [6:0] R_TYPE, LW, SW, BR, JAL, JALR, IMM;
+  assign Operation[0] = ((ALUOp == 2'b01) && (Funct3 == 3'b001)) || // BNE
+	((ALUOp == 2'b10) && (Funct3 == 3'b110)) ||  // R\I-or
+        ((ALUOp == 2'b10) && (Funct3 == 3'b101) && (Funct7 == 7'b0000000)) ||  // R\I->>
+        ((ALUOp == 2'b10) && (Funct3 == 3'b101) && (Funct7 == 7'b0100000)) ||  // R\I->>>
+	((ALUOp == 2'b10) && (Funct3 == 3'b010)) || // SLT, SLTI
+	((ALUOp == 2'b10) && (Funct3 == 3'b001)) ||  // R\I-<<
+	((ALUOp == 2'b10) && (Funct3 == 3'b100)); // BLT 
 
-  assign R_TYPE = 7'b0110011;  //add,and
-  assign LW = 7'b0000011;  //lw
-  assign SW = 7'b0100011;  //sw
-  assign BR = 7'b1100011;  //beq, blt* 
-  assign JAL = 7'b1101111;
-  assign JALR = 7'b1100111;
-  assign IMM = 7'b0010011; //using imm values
+  assign Operation[1] = (ALUOp == 2'b00) ||  // LW\SW
+	((ALUOp == 2'b01) && (Funct3 == 3'b101)) || // BGE
+        ((ALUOp == 2'b10) && (Funct3 == 3'b000)) ||  // R\I-add
+        ((ALUOp == 2'b10) && (Funct3 == 3'b101) && (Funct7 == 7'b0100000)) ||  // R\I->>>
+        ((ALUOp == 2'b10) && (Funct3 == 3'b000) && (Funct7 == 7'b0100000)) ||  // SUB
+	((ALUOp == 2'b10) && (Funct3 == 3'b010)) || // SLT, SLTI
+	((ALUOp == 2'b10) && (Funct3 == 3'b100)); // BLT 
+	
+  assign Operation[2] =  ((ALUOp==2'b10) && (Funct3==3'b101) && (Funct7==7'b0000000)) || // R\I->>
+        ((ALUOp == 2'b10) && (Funct3 == 3'b101) && (Funct7 == 7'b0100000)) ||  // R\I->>>
+        ((ALUOp == 2'b10) && (Funct3 == 3'b100) && (Funct7 == 7'b0000000)) || // XOR
+        ((ALUOp == 2'b10) && (Funct3 == 3'b001)) ||  // R\I-<<
+        ((ALUOp == 2'b10) && (Funct3 == 3'b000) && (Funct7 == 7'b0100000)) ||  // SUB
+	((ALUOp == 2'b10) && (Funct3 == 3'b100)); // BLT 
 
-  assign ALUSrc = (Opcode == LW || Opcode == SW || Opcode == IMM || Opcode == JALR);
-  assign MemtoReg = (Opcode == LW);
-  assign RegWrite = (Opcode == R_TYPE || Opcode == LW);
-  assign MemRead = (Opcode == LW);
-  assign MemWrite = (Opcode == SW);
-  assign ALUOp[0] = (Opcode == BR);
-  assign ALUOp[1] = (Opcode == R_TYPE);
-  assign Branch = (Opcode == BR || Opcode == JAL || Opcode == JALR);
+  assign Operation[3] = ((ALUOp == 2'b10) && (Funct3 == 3'b001)) ||  // R\I-<<
+	(ALUOp == 2'b01); // BEQ, BNE
 endmodule
